@@ -465,6 +465,10 @@ export default function Home() {
     }
 
     if (mode === "signup") {
+      if (password.length < 12) {
+        setAuthError("Password must be at least 12 characters.");
+        return;
+      }
       if (password !== confirmPassword) {
         setAuthError("Passwords do not match.");
         return;
@@ -921,6 +925,8 @@ export default function Home() {
                 required
                 type={showPassword ? "text" : "password"}
                 minLength={12}
+                onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity("Password must be at least 12 characters.")}
+                onInput={(e) => (e.target as HTMLInputElement).setCustomValidity("")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="12+ characters"
@@ -955,6 +961,8 @@ export default function Home() {
                     required
                     type={showConfirmPassword ? "text" : "password"}
                     minLength={12}
+                    onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity("Password must be at least 12 characters.")}
+                    onInput={(e) => (e.target as HTMLInputElement).setCustomValidity("")}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter password"
@@ -1307,7 +1315,7 @@ export default function Home() {
                     <button className="primary-button" onClick={() => setShowOverwriteModal(true)} style={{ backgroundColor: "#10b981", borderColor: "#059669" }}>
                       Apply AI Rewrite (Make Risk Free)
                     </button>
-                    <button className="secondary-button" onClick={handleApproveClick}>
+                    <button className="primary-button" onClick={handleApproveClick} style={{ backgroundColor: "#10b981", borderColor: "#059669" }}>
                       Approve & Mark Safe
                     </button>
                   </div>

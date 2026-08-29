@@ -63,7 +63,7 @@ button { cursor: pointer; }
 .risk-label.high { color: #ef4444; }
 
 .auth-brand-logo { display: flex; align-items: center; margin-bottom: 24px; }
-.auth-brand-logo .brand-text { font-size: 28px; font-weight: 800; color: #102a24; letter-spacing: -0.5px; }
+.auth-brand-logo .brand-text { font-size: 28px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
 
 @layer utilities {
   .text-balance {
