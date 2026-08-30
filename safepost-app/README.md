@@ -1,66 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SafePost App
 
-## Getting Started
+SafePost is a Next.js application for reviewing and rewriting social media posts with safety and compliance checks. It helps users assess risk, flag risky phrases, and generate safer alternatives before publishing.
 
-First, run the development server:
+## Features
+
+- Social post review dashboard
+- Platform-aware content analysis
+- Risk scoring and flagged phrase detection
+- AI-assisted rewrite suggestions
+- Profile management with workspace tracking
+- Supabase authentication support
+- MongoDB-backed workspace and post persistence
+- Local API key storage for Gemini-based rewrite generation
+
+## Tech Stack
+
+- Next.js 14
+- React 18
+- TypeScript
+- Tailwind CSS
+- MongoDB
+- Supabase
+- Gemini API
+
+## Project Structure
+
+```text
+safepost-app/
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── health/mongodb/route.ts
+│   │   │   ├── rewrite/route.ts
+│   │   │   └── workspace/route.ts
+│   │   ├── fonts/
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   └── lib/
+│       ├── mongodb.ts
+│       └── supabase.ts
+├── scripts/
+│   └── apply-mongodb-schema.js
+├── next.config.mjs
+├── package.json
+├── postcss.config.mjs
+├── supabase-schema.sql
+├── tailwind.config.ts
+├── tsconfig.json
+└── README.md
+```
+
+## Prerequisites
+
+Before running the project, make sure you have:
+
+- Node.js 18 or newer
+- npm
+- A MongoDB instance or connection string
+- A Supabase project
+- A Gemini API key for rewrite analysis
+
+## Environment Variables
+
+Create a `.env.local` file in the project root with variables similar to:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL="your_supabase_url"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your_supabase_anon_key"
+SUPABASE_SERVICE_ROLE_KEY="your_service_role_key"
+MONGODB_URI="mongodb://localhost:27017/safepost"
+GEMINI_API_KEY="your_gemini_api_key"
+```
+
+> The app also supports saving the Gemini API key in the browser local storage from the user profile screen.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Run Locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open:
 
-## Supabase setup
-
-The app uses Supabase Auth and Postgres when these variables are present in `.env.local`:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```text
+http://localhost:3000
 ```
 
-Run [`supabase-schema.sql`](supabase-schema.sql) in the Supabase SQL Editor. It creates the `profiles` and `posts` tables with row-level security. New accounts start with no posts; posts and profile changes are saved per user.
-
-Without these variables, the app stays in local demo mode.
-
-## MongoDB setup
-
-The server-side MongoDB client is available through `src/lib/mongodb.ts`. Add your MongoDB Atlas or local connection details to `.env.local`:
-
-```env
-MONGODB_URI=mongodb+srv://username:password@cluster.example.mongodb.net/?retryWrites=true&w=majority
-MONGODB_DB=safepost
-```
-
-The connection is cached between requests during local development. Test the configuration at `GET /api/health/mongodb`; it returns `{ "ok": true }` when the database is reachable. Keep `MONGODB_URI` server-only and never prefix it with `NEXT_PUBLIC_`.
-
-To enforce JSON Schema validation on the `profiles` collection, run:
+## Production Build
 
 ```bash
-node scripts/apply-mongodb-schema.js
+npm run build
+npm run start
 ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API Overview
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `/api/rewrite` — analyzes post content and returns risk score, flagged phrases, and suggested rewrite
+- `/api/workspace` — loads or persists user workspace profile and posts
+- `/api/health/mongodb` — checks MongoDB availability
 
-## Learn More
+## Notes
 
-To learn more about Next.js, take a look at the following resources:
+- The app stores user profile and workspace data in MongoDB when available.
+- Auth and API key state are persisted in the browser local storage for convenience.
+- For production use, always validate and secure API keys and sensitive environment values.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is currently for internal/demo use unless otherwise specified by the repository owner.
