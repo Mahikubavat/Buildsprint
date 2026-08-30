@@ -22,12 +22,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "A post body is required." }, { status: 400 });
     }
 
-    const key = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
+    const userApiKey = request.headers.get("x-gemini-api-key");
+    const key = userApiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
 
     if (!key) {
       return NextResponse.json(
-        { error: "Server AI service is not configured (GEMINI_API_KEY missing on server)." },
-        { status: 500 }
+        { error: "Gemini API key is required. Please set your Gemini API key in Profile settings." },
+        { status: 400 }
       );
     }
 

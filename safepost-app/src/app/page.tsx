@@ -74,6 +74,10 @@ export default function Home() {
     greeting: "Good morning",
   });
   const [workspaceId, setWorkspaceId] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [apiKeyAlert, setApiKeyAlert] = useState("");
 
   useEffect(() => {
     const updateTimeAndGreeting = () => {
@@ -106,6 +110,7 @@ export default function Home() {
       if (!profile?.email) return;
       const userWsId = `user:${profile.email.toLowerCase().trim()}`;
       setWorkspaceId(userWsId);
+      const savedApiKey = localStorage.getItem("gemini_api_key") || profile.apiKey || "";
 
       if (supabase && userId) {
         const [{ data: savedProfile }, { data: savedPosts }] = await Promise.all([
@@ -132,17 +137,19 @@ export default function Home() {
             avatar_url?: string | null;
             is_complete?: boolean | null;
           };
+          const currentKey = savedApiKey || profileData.api_key || "";
           setProfile({
             name: profileData.name,
             email: profileData.email,
             phone: profileData.phone ?? "",
             role: profileData.role ?? "",
             region: profileData.region ?? "India",
-            apiKey: profileData.api_key ?? "",
+            apiKey: currentKey,
             audience: profileData.audience ?? "",
             avatarUrl: profileData.avatar_url ?? "",
             isComplete: profileData.is_complete ?? Boolean(profileData.role && profileData.phone),
           });
+          setApiKeyInput(currentKey);
           setRole(profileData.role ?? "");
           setRegion(profileData.region ?? "India");
           setAudience(profileData.audience ?? "");
@@ -157,7 +164,10 @@ export default function Home() {
           try {
             const parsed = JSON.parse(rawProfile) as Profile;
             if (parsed.email === profile.email.toLowerCase().trim()) {
+              const currentKey = savedApiKey || parsed.apiKey || "";
+              parsed.apiKey = currentKey;
               setProfile(parsed);
+              setApiKeyInput(currentKey);
               setRole(parsed.role ?? "");
               setRegion(parsed.region ?? "India");
               setAudience(parsed.audience ?? "");
@@ -178,7 +188,10 @@ export default function Home() {
           }
           if (data.profile) {
             const loadedProfile = data.profile as Profile;
+            const currentKey = savedApiKey || loadedProfile.apiKey || "";
+            loadedProfile.apiKey = currentKey;
             setProfile(loadedProfile);
+            setApiKeyInput(currentKey);
             setRole(loadedProfile.role ?? "");
             setRegion(loadedProfile.region ?? "India");
             setAudience(loadedProfile.audience ?? "");
@@ -190,84 +203,114 @@ export default function Home() {
     void loadWorkspace();
   }, [profile?.email, userId]);
 
+  // Hydrate auth state on startup
   useEffect(() => {
-    if (!supabase) return;
-    const client = supabase;
-    void client.auth.getSession().then(({ data }) => {
-      const session = data.session;
-      if (!session?.user) return;
+    const savedApiKey = localStorage.getItem("gemini_api_key") || "";
+    setApiKeyInput(savedApiKey);
 
-      setUserId(session.user.id);
+    if (supabase) {
+      void supabase.auth.getSession().then(({ data }) => {
+        const session = data.session;
+        if (!session?.user) return;
 
-      const emailVal = session.user.email ?? "";
-      const userMeta = session.user.user_metadata ?? {};
+        localStorage.setItem("safepost_auth_token", session.access_token);
+        setUserId(session.user.id);
 
-      const next: Profile = {
-        name: (userMeta.name as string) || emailVal.split("@")[0] || "Creator",
-        email: emailVal,
-        phone: (userMeta.phone as string) || "",
-        role: (userMeta.role as string) || "",
-        region: (userMeta.region as string) || "India",
-        apiKey: (userMeta.apiKey as string) || "",
-        audience: (userMeta.audience as string) || "",
-        isComplete: Boolean(userMeta.role && userMeta.phone),
-      };
+        const emailVal = session.user.email ?? "";
+        const userMeta = session.user.user_metadata ?? {};
 
-      setRole(next.role);
-      setRegion(next.region);
-      if (next.audience !== undefined) setAudience(next.audience);
+        const next: Profile = {
+          name: (userMeta.name as string) || emailVal.split("@")[0] || "Creator",
+          email: emailVal,
+          phone: (userMeta.phone as string) || "",
+          role: (userMeta.role as string) || "",
+          region: (userMeta.region as string) || "India",
+          apiKey: savedApiKey || (userMeta.apiKey as string) || "",
+          audience: (userMeta.audience as string) || "",
+          isComplete: Boolean(userMeta.role && userMeta.phone),
+        };
 
-      void (async () => {
-        const [{ data: savedProfile }, { data: savedPosts }] = await Promise.all([
-          client
-            .from("profiles")
-            .select("name,email,phone,role,region,api_key,audience,is_complete,avatar_url")
-            .eq("id", session.user.id)
-            .maybeSingle(),
-          client
-            .from("posts")
-            .select("id,title,body,platform,status,score")
-            .eq("user_id", session.user.id)
-            .order("created_at", { ascending: false }),
-        ]);
+        setRole(next.role);
+        setRegion(next.region);
+        if (next.audience !== undefined) setAudience(next.audience);
 
-        if (savedProfile) {
-          const profileData = savedProfile as {
-            name: string;
-            email: string;
-            phone?: string | null;
-            role?: string | null;
-            region?: string | null;
-            api_key?: string | null;
-            audience?: string | null;
-            avatar_url?: string | null;
-            is_complete?: boolean | null;
-          };
-          setProfile({
-            name: profileData.name,
-            email: profileData.email,
-            phone: profileData.phone ?? "",
-            role: profileData.role ?? "",
-            region: profileData.region ?? "India",
-            apiKey: profileData.api_key ?? "",
-            audience: profileData.audience ?? "",
-            avatarUrl: profileData.avatar_url ?? "",
-            isComplete: profileData.is_complete ?? Boolean(profileData.role && profileData.phone),
-          });
-          setRole(profileData.role ?? "");
-          setRegion(profileData.region ?? "India");
-          setAudience(profileData.audience ?? "");
-        } else {
-          setProfile(next);
+        const client = supabase;
+        if (!client) return;
+        void (async () => {
+          const [{ data: savedProfile }, { data: savedPosts }] = await Promise.all([
+            client
+              .from("profiles")
+              .select("name,email,phone,role,region,api_key,audience,is_complete,avatar_url")
+              .eq("id", session.user.id)
+              .maybeSingle(),
+            client
+              .from("posts")
+              .select("id,title,body,platform,status,score")
+              .eq("user_id", session.user.id)
+              .order("created_at", { ascending: false }),
+          ]);
+
+          if (savedProfile) {
+            const profileData = savedProfile as {
+              name: string;
+              email: string;
+              phone?: string | null;
+              role?: string | null;
+              region?: string | null;
+              api_key?: string | null;
+              audience?: string | null;
+              avatar_url?: string | null;
+              is_complete?: boolean | null;
+            };
+            const currentKey = savedApiKey || profileData.api_key || "";
+            setProfile({
+              name: profileData.name,
+              email: profileData.email,
+              phone: profileData.phone ?? "",
+              role: profileData.role ?? "",
+              region: profileData.region ?? "India",
+              apiKey: currentKey,
+              audience: profileData.audience ?? "",
+              avatarUrl: profileData.avatar_url ?? "",
+              isComplete: profileData.is_complete ?? Boolean(profileData.role && profileData.phone),
+            });
+            setApiKeyInput(currentKey);
+            setRole(profileData.role ?? "");
+            setRegion(profileData.region ?? "India");
+            setAudience(profileData.audience ?? "");
+          } else {
+            setProfile(next);
+          }
+
+          const formattedPosts = (savedPosts as Post[] | null) ?? [];
+          setPosts(formattedPosts);
+          if (formattedPosts.length > 0) {
+            setSelectedId(formattedPosts[0].id);
+          }
+        })();
+      });
+    } else {
+      const currentUserEmail = localStorage.getItem("safepost-current-user");
+      if (currentUserEmail) {
+        const userWsId = `user:${currentUserEmail.toLowerCase().trim()}`;
+        setWorkspaceId(userWsId);
+        const rawProfile = localStorage.getItem(`safepost-profile-${currentUserEmail.toLowerCase().trim()}`);
+        if (rawProfile) {
+          try {
+            const parsed = JSON.parse(rawProfile) as Profile;
+            const currentKey = savedApiKey || parsed.apiKey || "";
+            parsed.apiKey = currentKey;
+            setProfile(parsed);
+            setApiKeyInput(currentKey);
+            setRole(parsed.role ?? "");
+            setRegion(parsed.region ?? "India");
+            setAudience(parsed.audience ?? "");
+          } catch {
+            // handle parse error
+          }
         }
-
-        const formattedPosts = (savedPosts as Post[] | null) ?? [];
-        setPosts(formattedPosts);
-        if (formattedPosts.length > 0) {
-          setSelectedId(formattedPosts[0].id);
-        }
-      })();
-    });
+      }
+    }
   }, []);
 
   const selected = posts.find((item) => item.id === selectedId) ??
@@ -302,9 +345,14 @@ export default function Home() {
     let isMounted = true;
     const fetchRiskScore = async () => {
       try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        const savedApiKey = localStorage.getItem("gemini_api_key") || profile?.apiKey;
+        if (savedApiKey) {
+          headers["x-gemini-api-key"] = savedApiKey;
+        }
         const response = await fetch("/api/rewrite", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({
             body: selected.body,
             region,
@@ -332,6 +380,11 @@ export default function Home() {
   }, [selectedId, selected, region, role, audience]);
 
   const save = (next: Profile) => {
+    if (next.apiKey) {
+      localStorage.setItem("gemini_api_key", next.apiKey);
+    } else {
+      localStorage.removeItem("gemini_api_key");
+    }
     if (next.email) {
       const normalizedEmail = next.email.toLowerCase().trim();
       localStorage.setItem(`safepost-profile-${normalizedEmail}`, JSON.stringify(next));
@@ -499,6 +552,9 @@ export default function Home() {
         return;
       }
 
+      if (result.data.session) {
+        localStorage.setItem("safepost_auth_token", result.data.session.access_token);
+      }
       setUserId(result.data.user.id);
       const next: Profile = {
         name: name || normalizedEmail.split("@")[0],
@@ -683,6 +739,12 @@ export default function Home() {
 
   const makeRewrite = async () => {
     if (!selected) return;
+    const savedApiKey = localStorage.getItem("gemini_api_key") || profile?.apiKey;
+    if (!savedApiKey) {
+      setApiKeyAlert("Gemini API key missing! Please configure your Gemini API Key in Profile Settings first.");
+      setView("Profile & context");
+      return;
+    }
     setLoading(true);
     setRewriteNote("");
     try {
@@ -690,6 +752,7 @@ export default function Home() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-gemini-api-key": savedApiKey,
         },
         body: JSON.stringify({
           body: selected.body,
@@ -1133,6 +1196,78 @@ export default function Home() {
                 <input value={profile.audience || ""} onChange={(e) => update("audience", e.target.value)} placeholder="Customers, creators & local communities" />
               </Field>
             </div>
+
+            <div className="gemini-api-key-section" style={{ margin: "1.5rem 0", padding: "1.25rem", backgroundColor: "#ffffff", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+              <div style={{ marginBottom: "0.75rem" }}>
+                <span className="eyebrow" style={{ color: "#4f46e5" }}>API CONFIGURATION</span>
+                <h3 style={{ margin: "0.25rem 0 0.5rem", fontSize: "1rem", fontWeight: 700 }}>Gemini API Key <span style={{ color: "#ef4444" }}>*</span></h3>
+                <p style={{ margin: 0, fontSize: "0.85rem", color: "#64748b" }}>Required to power SafePost AI content rewriting &amp; risk scoring.</p>
+              </div>
+
+              {apiKeyAlert && (
+                <div style={{ margin: "0.5rem 0 1rem", padding: "0.5rem 0.75rem", backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "6px", color: "#991b1b", fontSize: "0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>{apiKeyAlert}</span>
+                  <button type="button" onClick={() => setApiKeyAlert("")} style={{ border: "none", background: "none", color: "#991b1b", fontWeight: "bold", cursor: "pointer" }}>✕</button>
+                </div>
+              )}
+
+              <Field label="Gemini API Key">
+                <div className="input-with-icon" style={{ marginTop: "0.25rem" }}>
+                  <input
+                    required
+                    type={showApiKey ? "text" : "password"}
+                    value={apiKeyInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setApiKeyInput(val);
+                      update("apiKey", val);
+                      if (val) setApiKeyAlert("");
+                    }}
+                    placeholder="AIzaSy..."
+                  />
+                  <button
+                    type="button"
+                    className="eye-button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                    title={showApiKey ? "Hide API key" : "Show API key"}
+                  >
+                    {showApiKey ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </Field>
+
+              <div style={{ marginTop: "0.75rem" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowGuide(!showGuide)}
+                  style={{ border: "none", background: "none", padding: 0, color: "#4f46e5", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                >
+                  <span>{showGuide ? "▼ Hide helper guide" : "► How to get a Gemini API Key"}</span>
+                </button>
+
+                {showGuide && (
+                  <div style={{ marginTop: "0.5rem", padding: "0.75rem", backgroundColor: "#f8fafc", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "0.85rem", color: "#334155" }}>
+                    <p style={{ margin: "0 0 0.5rem", fontWeight: 600 }}>Steps to generate your key:</p>
+                    <ul style={{ margin: 0, paddingLeft: "1.25rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                      <li><strong>Step 1:</strong> Go to <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", textDecoration: "underline" }}>aistudio.google.com</a></li>
+                      <li><strong>Step 2:</strong> Sign in and click <strong>&quot;Create API Key&quot;</strong></li>
+                      <li><strong>Step 3:</strong> Copy your key and paste it here</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
             {!profile.isComplete && (
               <div style={{ margin: "1rem 0" }}>
                 <button
@@ -1164,8 +1299,11 @@ export default function Home() {
             <button
               className="signout-button"
               onClick={() => {
+                localStorage.removeItem("safepost_auth_token");
+                localStorage.removeItem("gemini_api_key");
                 localStorage.removeItem("safepost-current-user");
                 localStorage.removeItem("safepost-profile");
+                setApiKeyInput("");
                 setProfile(null);
                 setPosts([]);
                 setUserId(null);
